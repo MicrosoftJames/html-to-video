@@ -3,6 +3,11 @@
 A deterministic, frame-perfect pipeline for turning an AI-generated HTML/JS/SVG/canvas
 animation into an MP4 you can drop into a YouTube video.
 
+![Matrix-style binary counter rendered by this pipeline](demo.gif)
+
+> Above: a 1-D 10-bit register counting 0 → 1000 (LSB on the right), rendered with
+> this pipeline and exported to GIF.
+
 ## How it works
 
 1. `animation.html` draws your animation as a **pure function of time** — it exposes
@@ -49,6 +54,20 @@ That single rule (animation = `f(t)`) is what makes the capture deterministic.
 - Need a transparent overlay instead? Render to a `.mov` with alpha by swapping the
   ffmpeg codec to `prores_ks -pix_fmt yuva444p10le` and screenshotting with
   `omitBackground: true`.
+
+## Exporting a GIF (e.g. for this README)
+
+GIFs render inline on GitHub. Use a palette for clean colors:
+
+```bash
+ffmpeg -y -i matrix-binary.mp4 \
+  -vf "fps=15,scale=600:-1:flags=lanczos,palettegen=stats_mode=diff" palette.png
+ffmpeg -y -i matrix-binary.mp4 -i palette.png \
+  -lavfi "fps=15,scale=600:-1:flags=lanczos,paletteuse=dither=bayer:bayer_scale=4" demo.gif
+```
+
+Lower `fps`/`scale` to shrink the file. MP4 looks better and is smaller, but isn't
+committed to the repo — a GIF is the dependable choice for a README demo.
 
 ## Files
 

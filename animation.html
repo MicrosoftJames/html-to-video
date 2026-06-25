@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Animation</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #0b1021; overflow: hidden; }
+  #stage { display: block; }
+</style>
+</head>
+<body>
+<!--
+  HOW THIS WORKS
+  --------------
+  The renderer (render.js) controls time by calling window.__renderFrame(t)
+  where `t` is the elapsed time in SECONDS. Your animation must be a pure
+  function of `t` so every frame is reproducible. Do NOT use Date.now(),
+  CSS animations, or uncontrolled requestAnimationFrame for the captured
+  motion — drive everything from `t`.
+
+  Set FPS / DURATION / size in render.js to match what you want.
+-->
+<canvas id="stage" width="1280" height="720"></canvas>
+<script>
+  const canvas = document.getElementById('stage');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+
+  // ---- Your animation, as a pure function of time `t` (seconds) ----
+  function drawFrame(t) {
+    ctx.fillStyle = '#0b1021';
+    ctx.fillRect(0, 0, W, H);
+
+    const cx = W / 2, cy = H / 2;
+    const count = 12;
+    for (let i = 0; i < count; i++) {
+      const phase = (i / count) * Math.PI * 2;
+      const radius = 180 + 60 * Math.sin(t * 1.2 + phase * 2);
+      const angle = t * 0.8 + phase;
+      const x = cx + Math.cos(angle) * radius;
+      const y = cy + Math.sin(angle) * radius;
+      const hue = (i / count) * 360 + t * 40;
+      ctx.beginPath();
+      ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
+      ctx.arc(x, y, 14 + 6 * Math.sin(t * 3 + phase), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '600 56px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.globalAlpha = Math.min(1, t / 0.6); // fade in over first 0.6s
+    ctx.fillText('Your Animation Here', cx, cy);
+    ctx.globalAlpha = 1;
+  }
+
+  // ---- Render hook used by render.js (do not remove) ----
+  window.__renderFrame = function (t) { drawFrame(t); };
+
+  // Live preview when opened directly in a browser (ignored during capture)
+  if (!window.__capturing) {
+    const start = performance.now();
+    (function loop() {
+      window.__renderFrame((performance.now() - start) / 1000);
+      requestAnimationFrame(loop);
+    })();
+  }
+</script>
+</body>
+</html>

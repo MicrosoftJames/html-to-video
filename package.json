@@ -1,0 +1,17 @@
+{
+  "name": "verytemporary",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "render": "node render.js",
+    "preview": "echo \"Open animation.html in your browser\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "puppeteer-core": "^25.2.1"
+  },
+  "type": "commonjs"
+}

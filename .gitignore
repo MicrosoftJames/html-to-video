@@ -1,0 +1,9 @@
+node_modules/
+
+# Rendered videos are build artifacts
+*.mp4
+
+# Animations are content, not part of the pipeline.
+# Keep one example HTML to demonstrate the f(t) render hook.
+*.html
+!animation.html

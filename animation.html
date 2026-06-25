@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Animation</title>
+<title>HTML → Video pipeline</title>
 <style>
   html, body { margin: 0; padding: 0; background: #0b1021; overflow: hidden; }
   #stage { display: block; }
@@ -10,15 +10,16 @@
 </head>
 <body>
 <!--
-  HOW THIS WORKS
-  --------------
-  The renderer (render.js) controls time by calling window.__renderFrame(t)
-  where `t` is the elapsed time in SECONDS. Your animation must be a pure
-  function of `t` so every frame is reproducible. Do NOT use Date.now(),
-  CSS animations, or uncontrolled requestAnimationFrame for the captured
-  motion — drive everything from `t`.
+  This animation visualizes the pipeline this repo implements:
 
-  Set FPS / DURATION / size in render.js to match what you want.
+      animation.html  (frame = f(t))
+        ->  headless Chromium screenshots each frame
+        ->  ffmpeg encodes the frames
+        ->  out.mp4
+
+  It is also a working example of the render contract: the whole thing is a
+  pure function of `t` (seconds) exposed via window.__renderFrame(t), so it
+  can be captured deterministically by render.js. It loops every LOOP seconds.
 -->
 <canvas id="stage" width="1280" height="720"></canvas>
 <script>
@@ -26,39 +27,168 @@
   const ctx = canvas.getContext('2d');
   const W = canvas.width, H = canvas.height;
 
-  // ---- Your animation, as a pure function of time `t` (seconds) ----
+  const LOOP = 6;            // seconds per loop
+  const GREEN = '#39e08a';
+  const DIM = 'rgba(57,224,138,0.25)';
+  const INK = '#9fb3c8';
+
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+  const ease = (p) => p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2;
+
+  // A tiny "frame" thumbnail: a sine wave sampled at time u (shows that the
+  // captured content is itself a function of time).
+  function drawThumb(x, y, w, h, u, bright) {
+    ctx.save();
+    rr(x, y, w, h, 6);
+    ctx.fillStyle = bright ? 'rgba(57,224,138,0.18)' : 'rgba(255,255,255,0.04)';
+    ctx.fill();
+    ctx.strokeStyle = bright ? GREEN : DIM;
+    ctx.lineWidth = bright ? 2 : 1;
+    ctx.stroke();
+    ctx.clip();
+    ctx.beginPath();
+    for (let i = 0; i <= w; i += 3) {
+      const yy = y + h / 2 + Math.sin(i * 0.05 + u * 4) * (h * 0.28);
+      i === 0 ? ctx.moveTo(x + i, yy) : ctx.lineTo(x + i, yy);
+    }
+    ctx.strokeStyle = bright ? '#bdffd9' : DIM;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function panel(x, y, w, h, title) {
+    rr(x, y, w, h, 14);
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(159,179,200,0.35)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.fillStyle = INK;
+    ctx.font = '600 20px ui-monospace, monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(title, x + 18, y + 30);
+  }
+
+  function arrow(x1, x2, y, active) {
+    ctx.strokeStyle = active ? GREEN : 'rgba(159,179,200,0.35)';
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.lineWidth = active ? 3 : 2;
+    ctx.beginPath();
+    ctx.moveTo(x1, y); ctx.lineTo(x2 - 10, y); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(x2, y); ctx.lineTo(x2 - 12, y - 7); ctx.lineTo(x2 - 12, y + 7);
+    ctx.closePath(); ctx.fill();
+  }
+
   function drawFrame(t) {
+    const p = (t % LOOP) / LOOP;        // 0..1 loop phase
     ctx.fillStyle = '#0b1021';
     ctx.fillRect(0, 0, W, H);
 
-    const cx = W / 2, cy = H / 2;
-    const count = 12;
-    for (let i = 0; i < count; i++) {
-      const phase = (i / count) * Math.PI * 2;
-      const radius = 180 + 60 * Math.sin(t * 1.2 + phase * 2);
-      const angle = t * 0.8 + phase;
-      const x = cx + Math.cos(angle) * radius;
-      const y = cy + Math.sin(angle) * radius;
-      const hue = (i / count) * 360 + t * 40;
-      ctx.beginPath();
-      ctx.fillStyle = `hsl(${hue}, 80%, 60%)`;
-      ctx.arc(x, y, 14 + 6 * Math.sin(t * 3 + phase), 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // faint grid
+    ctx.strokeStyle = 'rgba(159,179,200,0.05)';
+    ctx.lineWidth = 1;
+    for (let gx = 0; gx < W; gx += 40) { ctx.beginPath(); ctx.moveTo(gx, 0); ctx.lineTo(gx, H); ctx.stroke(); }
+    for (let gy = 0; gy < H; gy += 40) { ctx.beginPath(); ctx.moveTo(0, gy); ctx.lineTo(W, gy); ctx.stroke(); }
 
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '600 56px system-ui, sans-serif';
+    // title
+    ctx.fillStyle = '#e9f1f7';
+    ctx.font = '700 34px ui-monospace, monospace';
     ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.globalAlpha = Math.min(1, t / 0.6); // fade in over first 0.6s
-    ctx.fillText('Your Animation Here', cx, cy);
-    ctx.globalAlpha = 1;
+    ctx.fillText('HTML animation  →  video', W / 2, 70);
+    ctx.fillStyle = INK;
+    ctx.font = '500 18px ui-monospace, monospace';
+    ctx.fillText('frame = f(t)   →   screenshot every frame   →   ffmpeg   →   out.mp4', W / 2, 102);
+
+    const midY = 380;
+    // --- which stage is "active" right now ---
+    const stage = Math.min(2, Math.floor(p * 3)); // 0,1,2
+    const sp = (p * 3) % 1;                        // progress within stage
+
+    // ---------- Panel 1: f(t) source ----------
+    panel(110, 250, 280, 250, 'animation.html');
+    // rotating clock = the time source
+    const cx = 250, cy = 390, cr = 64;
+    ctx.beginPath(); ctx.arc(cx, cy, cr, 0, Math.PI * 2);
+    ctx.strokeStyle = stage === 0 ? GREEN : DIM; ctx.lineWidth = 3; ctx.stroke();
+    const ang = -Math.PI / 2 + (t % LOOP) / LOOP * Math.PI * 2 * 3;
+    ctx.beginPath(); ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(ang) * (cr - 14), cy + Math.sin(ang) * (cr - 14));
+    ctx.strokeStyle = '#bdffd9'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.fillStyle = INK; ctx.font = '600 16px ui-monospace, monospace';
+    ctx.textAlign = 'center'; ctx.fillText('t', cx, cy + cr + 28);
+
+    // ---------- Panel 2: capture (filmstrip) ----------
+    panel(430, 250, 420, 250, 'headless capture');
+    const fw = 70, fh = 56, gap = 12;
+    const cols = 4, rows = 2;
+    let idx = 0;
+    // how many frames captured so far this loop (fills during stage 0+1)
+    const captured = Math.floor(Math.min(1, p * 1.6) * (cols * rows));
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const fx = 452 + c * (fw + gap);
+        const fy = 300 + r * (fh + gap + 10);
+        const shotNow = idx === captured && stage <= 1;
+        drawThumb(fx, fy, fw, fh, (idx / (cols * rows)) * 1.2, idx < captured || shotNow);
+        idx++;
+      }
+    }
+    ctx.fillStyle = INK; ctx.font = '500 15px ui-monospace, monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(captured + ' / ' + (cols * rows) + ' frames', 640, 492);
+
+    // ---------- Panel 3: ffmpeg encode -> mp4 ----------
+    panel(890, 250, 280, 250, 'ffmpeg encode');
+    // progress bar fills during stage 2
+    const barX = 912, barY = 360, barW = 236, barH = 22;
+    rr(barX, barY, barW, barH, 11); ctx.strokeStyle = DIM; ctx.lineWidth = 2; ctx.stroke();
+    const enc = stage === 2 ? ease(sp) : (stage > 2 ? 1 : 0);
+    rr(barX, barY, Math.max(0.001, barW * enc), barH, 11);
+    ctx.fillStyle = GREEN; ctx.fill();
+    // play button (pulses when encode done)
+    const done = stage === 2 && sp > 0.9;
+    const pulse = done ? 1 + 0.08 * Math.sin(t * 18) : 1;
+    ctx.save();
+    ctx.translate(1030, 430); ctx.scale(pulse, pulse);
+    ctx.beginPath(); ctx.arc(0, 0, 34, 0, Math.PI * 2);
+    ctx.strokeStyle = done ? '#bdffd9' : DIM; ctx.lineWidth = 3; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-10, -16); ctx.lineTo(16, 0); ctx.lineTo(-10, 16);
+    ctx.closePath(); ctx.fillStyle = done ? GREEN : DIM; ctx.fill();
+    ctx.restore();
+    ctx.fillStyle = INK; ctx.font = '600 16px ui-monospace, monospace';
+    ctx.textAlign = 'center'; ctx.fillText('out.mp4', 1030, 488);
+
+    // ---------- arrows ----------
+    arrow(392, 428, midY, stage === 0);
+    arrow(852, 888, midY, stage === 1);
+
+    // ---------- traveling frame token ----------
+    // path: clock (250,390) -> filmstrip (640,360) -> encoder (1030,360)
+    let tx, ty;
+    if (stage === 0) { tx = 250 + (640 - 250) * ease(sp); ty = 390 + (360 - 390) * ease(sp); }
+    else if (stage === 1) { tx = 640 + (1030 - 640) * ease(sp); ty = 360; }
+    else { tx = 1030; ty = 360; }
+    if (stage < 2) {
+      ctx.save();
+      ctx.shadowColor = GREEN; ctx.shadowBlur = 18;
+      drawThumb(tx - 24, ty - 19, 48, 38, (t % LOOP) / LOOP * 1.2, true);
+      ctx.restore();
+    }
   }
 
-  // ---- Render hook used by render.js (do not remove) ----
   window.__renderFrame = function (t) { drawFrame(t); };
 
-  // Live preview when opened directly in a browser (ignored during capture)
   if (!window.__capturing) {
     const start = performance.now();
     (function loop() {

@@ -3,10 +3,11 @@
 A deterministic, frame-perfect pipeline for turning an AI-generated HTML/JS/SVG/canvas
 animation into an MP4 you can drop into a YouTube video.
 
-![Matrix-style binary counter rendered by this pipeline](demo.gif)
+![Animated diagram of the render pipeline](demo.gif)
 
-> Above: a 1-D 10-bit register counting 0 → 1000 (LSB on the right), rendered with
-> this pipeline and exported to GIF.
+> Above: the pipeline itself, animated — `frame = f(t)` is screenshotted frame
+> by frame in a headless browser, then encoded by ffmpeg into `out.mp4`. The
+> diagram is `animation.html` in this repo, rendered by `render.js`.
 
 ## How it works
 
@@ -71,5 +72,5 @@ committed to the repo — a GIF is the dependable choice for a README demo.
 
 ## Files
 
-- `animation.html` — your animation (sample: orbiting colored dots + title).
+- `animation.html` — example animation (an animated diagram of this pipeline).
 - `render.js` — the capture + encode script.
